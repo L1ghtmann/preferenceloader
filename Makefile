@@ -1,6 +1,6 @@
 ARCHS = armv7 arm64
-
 TARGET = iphone:clang:latest:5.0
+INSTALL_TARGET_PROCESSES = Preferences
 
 include $(THEOS)/makefiles/common.mk
 
@@ -34,6 +34,3 @@ after-libprefs-stage::
 after-stage::
 	$(FAKEROOT) chown -R 0:80 $(THEOS_STAGING_DIR)
 	mkdir -p $(THEOS_STAGING_DIR)/Library/PreferenceBundles $(THEOS_STAGING_DIR)/Library/PreferenceLoader/Preferences
-
-after-install::
-	install.exec "killall -9 Preferences"

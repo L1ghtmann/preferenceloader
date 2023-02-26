@@ -290,6 +290,19 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 	NSString *specifierID = nil;
 	result = SpecifiersFromPlist(properties, [self specifier], target, plistName, [self bundle], &title, &specifierID, self, &bundleControllers);
 
+	NSString *file = [[self bundle] pathForResource:plistName ofType:@"plist"];
+	if(![[NSFileManager defaultManager] isReadableFileAtPath:file]) {
+		PLLog(@"%@ is NOT readable!", file);
+		[self setTitle:[NSString stringWithFormat:@"%@.plist is unreadable", plistName]];
+		return nil;
+	}
+
+	if([result count] < 1) {
+		PLLog(@"%@ likely has a format error!", file);
+		[self setTitle:[NSString stringWithFormat:@"%@.plist format error", plistName]];
+		return nil;
+	}
+
 	if(title)
 		[self setTitle:title];
 
@@ -346,6 +359,11 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 	} else {
 		prefBundle = [NSBundle bundleWithPath:sourceBundlePath];
 		PLLog(@"is NOT a bundle, so we're giving it %@!", prefBundle);
+	}
+
+	if(![[NSFileManager defaultManager] isReadableFileAtPath:bundlePath]) {
+		PLLog(@"%@ is NOT readable!", bundlePath);
+		return nil;
 	}
 
 	PLLog(@"loading specifiers!");
