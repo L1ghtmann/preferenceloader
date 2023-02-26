@@ -16,3 +16,7 @@ extern NSString *const PLFilterKey;
 
 @interface PLLocalizedListController: PLCustomListController { }
 @end
+
+@interface PLFailedBundleListController: PSListController { }
+@property (retain) NSArray *errorSpecifiers;
+@end
