@@ -1,7 +1,5 @@
-#import <Preferences/PSSpecifier.h>
-#import <Preferences/PSListController.h>
 #import <substrate.h>
-
+#import <dlfcn.h>
 #import "prefs.h"
 
 #define DEBUG_TAG "PreferenceLoader"
@@ -33,12 +31,11 @@ static NSInteger PSSpecifierSort(PSSpecifier *a1, PSSpecifier *a2, void *context
 	return [string1 localizedCaseInsensitiveCompare:string2];
 }
 
-- (id)specifiers {
+- (NSArray *)specifiers {
 	bool first = (MSHookIvar<id>(self, "_specifiers") == nil);
 	if(first) {
 		PLLog(@"initial invocation for -specifiers");
 		%orig;
-		[_loadedSpecifiers release];
 		_loadedSpecifiers = [[NSMutableArray alloc] init];
 		NSArray *subpaths = [[NSFileManager defaultManager] subpathsOfDirectoryAtPath:@"/Library/PreferenceLoader/Preferences" error:NULL];
 		for(NSString *item in subpaths) {
@@ -69,7 +66,7 @@ static NSInteger PSSpecifierSort(PSSpecifier *a1, PSSpecifier *a2, void *context
 			[_loadedSpecifiers insertObject:groupSpecifier atIndex:0];
 			NSMutableArray *_specifiers = MSHookIvar<NSMutableArray *>(self, "_specifiers");
 			NSInteger firstindex = [_specifiers count];
-				
+
 			PLLog(@"Adding to the end of entire list");
 
 			NSIndexSet *indices = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(firstindex, [_loadedSpecifiers count])];
@@ -82,7 +79,7 @@ static NSInteger PSSpecifierSort(PSSpecifier *a1, PSSpecifier *a2, void *context
 				++groupIndex;
 			}
 			_extraPrefsGroupSectionID = groupIndex;
-			PLLog(@"group index is %d", _extraPrefsGroupSectionID);
+			PLLog(@"group index is %ld", (long)_extraPrefsGroupSectionID);
 		}
 	}
 	return MSHookIvar<id>(self, "_specifiers");

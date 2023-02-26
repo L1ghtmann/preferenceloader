@@ -1,10 +1,5 @@
-#import <Preferences/PSSpecifier.h>
-#import <Preferences/PSListController.h>
-#import <Preferences/PSBundleController.h>
-#import <Preferences/PSTableCell.h>
 #import <substrate.h>
 #import <dlfcn.h>
-
 #import "prefs.h"
 
 #define DEBUG_TAG "libprefs"
@@ -31,8 +26,8 @@ extern NSString *const PSActionKey;
 extern NSString *const PSTitleKey;
 
 // Weak (3.2+, dlsym)
-static NSString **pPSFooterTextGroupKey = NULL;
-static NSString **pPSStaticTextGroupKey = NULL;
+static NSString __strong **pPSFooterTextGroupKey = NULL;
+static NSString __strong **pPSStaticTextGroupKey = NULL;
 /* }}} */
 
 /* {{{ PSSpecifier 3.2 Additions */
@@ -48,32 +43,31 @@ static NSString **pPSStaticTextGroupKey = NULL;
 /* }}} */
 
 /* {{{ Prototypes */
-static NSArray *generateErrorSpecifiersWithText(NSString *errorText);
+static NSMutableArray *generateErrorSpecifiersWithText(NSString *errorText);
 /* }}} */
 
 /* {{{ Preferences Controllers */
 @implementation PLCustomListController
-- (id)bundle {
+- (NSBundle *)bundle {
 	return [[self specifier] preferenceLoaderBundle];
 }
 
-- (id)specifiers {
+- (NSMutableArray *)specifiers {
 	if(!_specifiers) {
 		PLLog(@"loading specifiers for a custom bundle.");
 		PSSpecifier *specifier = [self specifier];
 		if(!specifier) {
 			NSString *errorText = @"There appears to have been an error restoring these preferences!";
-			return _specifiers = [[NSMutableArray alloc] initWithArray:generateErrorSpecifiersWithText(errorText)];
+			return _specifiers = generateErrorSpecifiersWithText(errorText);
 		}
 		NSString *alternatePlistName = [specifier propertyForKey:PLAlternatePlistNameKey];
 		if(alternatePlistName)
-			_specifiers = [[self loadSpecifiersFromPlistName:alternatePlistName target:self] retain];
+			_specifiers = [self loadSpecifiersFromPlistName:alternatePlistName target:self];
 		else
 			_specifiers = [super specifiers];
 		if(!_specifiers || [_specifiers count] == 0) {
-			[_specifiers release];
 			NSString *errorText = @"There appears to be an error with these preferences!";
-			_specifiers = [[NSMutableArray alloc] initWithArray:generateErrorSpecifiersWithText(errorText)];
+			_specifiers = generateErrorSpecifiersWithText(errorText);
 		} else {
 			if([self respondsToSelector:@selector(setTitle:)]) {
 				[self setTitle:specifier.name];
@@ -90,7 +84,6 @@ static NSArray *generateErrorSpecifiersWithText(NSString *errorText);
 
 				if(removals.count > 0) {
 					NSMutableArray *newSpecifiers = [_specifiers mutableCopy];
-					[_specifiers release];
 					[newSpecifiers removeObjectsInArray:removals];
 					_specifiers = newSpecifiers;
 				}
@@ -100,19 +93,18 @@ static NSArray *generateErrorSpecifiersWithText(NSString *errorText);
 	return _specifiers;
 }
 
-- (id)navigationTitle {
+- (NSString *)navigationTitle {
 	return self.specifier.name;
 }
-
 @end
 
 @implementation PLLocalizedListController
-- (id)navigationTitle {
+- (NSString *)navigationTitle {
 	NSString *original = [super navigationTitle];
 	return [[self bundle] localizedStringForKey:original value:original table:nil];
 }
 
-- (id)specifiers {
+- (NSArray *)specifiers {
 	if(!_specifiers) {
 		PLLog(@"Localizing specifiers for a localized bundle.");
 		_specifiers = [super specifiers];
@@ -151,18 +143,16 @@ static NSArray *generateErrorSpecifiersWithText(NSString *errorText);
 }
 @end
 
-@interface PLFailedBundleListController: PSListController { }
-@end
 @implementation PLFailedBundleListController
-- (id)navigationTitle {
+- (NSString *)navigationTitle {
 	return @"Error";
 }
 
-- (id)specifiers {
+- (NSArray *)specifiers {
 	if(!_specifiers) {
 		PLLog(@"Generating error specifiers for a failed bundle :(");
 		NSString *const errorText = [NSString stringWithFormat:@"There was an error loading the preference bundle for %@.", [[self specifier] name]];
-		_specifiers = [[NSMutableArray alloc] initWithArray:generateErrorSpecifiersWithText(errorText)];
+		_specifiers = generateErrorSpecifiersWithText(errorText);
 	}
 	return _specifiers;
 }
@@ -170,7 +160,7 @@ static NSArray *generateErrorSpecifiersWithText(NSString *errorText);
 /* }}} */
 
 /* {{{ Helper Functions */
-static NSArray *generateErrorSpecifiersWithText(NSString *errorText) {
+static NSMutableArray *generateErrorSpecifiersWithText(NSString *errorText) {
 	NSMutableArray *errorSpecifiers = [NSMutableArray array];
 	if(pPSFooterTextGroupKey) {
 		PSSpecifier *spec = [PSSpecifier emptyGroupSpecifier];
@@ -212,7 +202,6 @@ static NSArray *generateErrorSpecifiersWithText(NSString *errorText) {
 - (NSBundle *)preferenceLoaderBundle {
 	return [self propertyForKey:PLBundleKey];
 }
-
 @end
 /* }}} */
 
@@ -228,15 +217,14 @@ static void pl_loadFailedBundle(NSString *bundlePath, PSSpecifier *specifier) {
 }
 
 static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, void(*_orig)(id, SEL, PSSpecifier *)) {
-	NSString *bundlePath = [[specifier propertyForKey:PSLazilyLoadedBundleKey] retain];
-	PLLog(@"In pl_lazyLoadBundleCore for %@ (%s), specifier %@", self, _cmd, specifier);
+	NSString *bundlePath = [specifier propertyForKey:PSLazilyLoadedBundleKey];
+	PLLog(@"In pl_lazyLoadBundleCore for %@ (%@), specifier %@", self, NSStringFromSelector(_cmd), specifier);
 	PLLog(@"%%orig is %p.", _orig);
 
 	_orig(self, _cmd, specifier); // NB: This removes the PSLazilyLoadedBundleKey property.
 	if(![[NSBundle bundleWithPath:bundlePath] isLoaded]) {
 		pl_loadFailedBundle(bundlePath, specifier);
 	}
-	[bundlePath release];
 }
 
 %hook PSListController
@@ -245,8 +233,7 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 }
 
 %new
-- (PSViewController *)controllerForSpecifier:(PSSpecifier *)specifier
-{
+- (PSViewController *)controllerForSpecifier:(PSSpecifier *)specifier {
 	Class detailClass = [specifier respondsToSelector:@selector(detailControllerClass)] ? [specifier detailControllerClass] : MSHookIvar<Class>(specifier, "detailControllerClass");
 	if (!detailClass)
 		detailClass = [PLCustomListController class];
@@ -264,11 +251,10 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 	if ([result respondsToSelector:@selector(setSpecifier:)])
 		[result setSpecifier:specifier];
 	else if ([result isKindOfClass:[PSListController class]]) {
-		PSSpecifier *&_specifierIvar = MSHookIvar<PSSpecifier *>(result, "_specifier");
-		[_specifierIvar release];
-		_specifierIvar = [specifier retain];
+		PSSpecifier __strong *&_specifierIvar = MSHookIvar<PSSpecifier *>(result, "_specifier");
+		_specifierIvar = specifier;
 	}
-	return [result autorelease];
+	return result;
 }
 %end
 
@@ -289,7 +275,6 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 /* }}} */
 
 @implementation PSListController (libprefs)
-
 - (NSArray *)specifiersFromEntry:(NSDictionary *)entry sourcePreferenceLoaderBundlePath:(NSString *)sourceBundlePath title:(NSString *)title {
 	NSDictionary *specifierPlist = [NSDictionary dictionaryWithObjectsAndKeys:[NSArray arrayWithObjects:entry, nil], @"items", nil];
 
@@ -322,7 +307,7 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 	}
 
 	PLLog(@"loading specifiers!");
-	NSMutableArray *&bundleControllers = MSHookIvar<NSMutableArray *>(self, "_bundleControllers");
+	NSMutableArray __strong *&bundleControllers = MSHookIvar<NSMutableArray *>(self, "_bundleControllers");
 	NSArray *specs = SpecifiersFromPlist(specifierPlist, nil, self, title, prefBundle, NULL, NULL, (PSListController*)self, &bundleControllers);
 	PLLog(@"loaded specifiers!");
 
@@ -356,7 +341,6 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 
 	return specs;
 }
-
 @end
 
 %ctor {
@@ -364,8 +348,8 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 
 	void *preferencesHandle = dlopen("/System/Library/PrivateFrameworks/Preferences.framework/Preferences", RTLD_LAZY | RTLD_NOLOAD);
 	if(preferencesHandle) {
-		pPSFooterTextGroupKey = (NSString **)dlsym(preferencesHandle, "PSFooterTextGroupKey");
-		pPSStaticTextGroupKey = (NSString **)dlsym(preferencesHandle, "PSStaticTextGroupKey");
+		pPSFooterTextGroupKey = (NSString __strong **)dlsym(preferencesHandle, "PSFooterTextGroupKey");
+		pPSStaticTextGroupKey = (NSString __strong **)dlsym(preferencesHandle, "PSStaticTextGroupKey");
 		dlclose(preferencesHandle);
 	}
 }
