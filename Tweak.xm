@@ -42,6 +42,10 @@ static NSInteger PSSpecifierSort(PSSpecifier *a1, PSSpecifier *a2, void *context
 			if(![[item pathExtension] isEqualToString:@"plist"]) continue;
 			PLLog(@"processing %@", item);
 			NSString *fullPath = [NSString stringWithFormat:@"/Library/PreferenceLoader/Preferences/%@", item];
+			if(![[NSFileManager defaultManager] isReadableFileAtPath:fullPath]) {
+				PLLog(@"%@ is NOT readable!", item);
+				continue;
+			}
 			NSDictionary *plPlist = [NSDictionary dictionaryWithContentsOfFile:fullPath];
 			if(![PSSpecifier environmentPassesPreferenceLoaderFilter:[plPlist objectForKey:@"filter"] ?: [plPlist objectForKey:PLFilterKey]]) continue;
 
