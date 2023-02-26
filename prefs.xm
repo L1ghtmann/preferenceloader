@@ -335,17 +335,17 @@ static void pl_lazyLoadBundleCore(id self, SEL _cmd, PSSpecifier *specifier, voi
 		return nil;
 
 	PLLog(@"Loading specifiers from PSListController's specifier's properties.");
-	NSMutableArray __strong *&bundleControllers = MSHookIvar<NSMutableArray *>(self, "_bundleControllers");
-	NSString *title = nil;
-	NSString *specifierID = nil;
-	result = SpecifiersFromPlist(properties, [self specifier], target, plistName, [self bundle], &title, &specifierID, self, &bundleControllers);
-
 	NSString *file = [[self bundle] pathForResource:plistName ofType:@"plist"];
 	if(![[NSFileManager defaultManager] isReadableFileAtPath:file]) {
 		PLLog(@"%@ is NOT readable!", file);
 		[self setTitle:[NSString stringWithFormat:@"%@.plist is unreadable", plistName]];
 		return nil;
 	}
+
+	NSMutableArray __strong *&bundleControllers = MSHookIvar<NSMutableArray *>(self, "_bundleControllers");
+	NSString *title = nil;
+	NSString *specifierID = nil;
+	result = SpecifiersFromPlist(properties, [self specifier], target, plistName, [self bundle], &title, &specifierID, self, &bundleControllers);
 
 	if([result count] < 1) {
 		PLLog(@"%@ likely has a format error!", file);
